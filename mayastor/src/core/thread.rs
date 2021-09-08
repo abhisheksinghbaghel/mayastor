@@ -207,7 +207,7 @@ impl Mthread {
             F::Output: Send + Debug,
         {
             let mut ctx = unsafe { Box::from_raw(arg as *mut Ctx<F>) };
-            Reactors::current()
+            let _ = Reactors::current()
                 .spawn_local(async move {
                     let result = ctx.future.await;
                     if let Err(e) = ctx
@@ -218,8 +218,7 @@ impl Mthread {
                     {
                         error!("Failed to send response future result {:?}", e);
                     }
-                })
-                .detach();
+                });
         }
 
         let (s, r) = channel::<F::Output>();
