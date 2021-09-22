@@ -302,6 +302,8 @@ async fn nexus_create_v2(
         .unwrap_or_else(|e| e.exit());
     let resv_key = value_t!(matches.value_of("resv-key"), u64)
         .unwrap_or_else(|e| e.exit());
+    let preempt_key = value_t!(matches.value_of("preempt-key"), u64)
+        .unwrap_or_else(|e| e.exit());
 
     let response = ctx
         .client
@@ -312,6 +314,7 @@ async fn nexus_create_v2(
             min_cntl_id,
             max_cntl_id,
             resv_key,
+            preempt_key,
             children,
         })
         .await

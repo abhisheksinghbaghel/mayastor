@@ -681,6 +681,7 @@ impl mayastor_server::Mayastor for MayastorSvc {
                             min_cntlid: args.min_cntl_id as u16,
                             max_cntlid: args.max_cntl_id as u16,
                             resv_key: args.resv_key,
+                            preempt_key: args.preempt_key,
                         },
                         &args.children,
                     )
