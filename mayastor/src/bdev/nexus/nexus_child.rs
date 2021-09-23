@@ -413,6 +413,7 @@ impl NexusChild {
     pub(crate) async fn acquire_write_exclusive(
         &self,
         key: u64,
+        preempt_key: u64,
     ) -> Result<(), ChildError> {
         if std::env::var("NEXUS_NVMF_RESV_ENABLE").is_err() {
             return Ok(());
@@ -434,8 +435,11 @@ impl NexusChild {
             .resv_acquire(
                 &*hdl,
                 key,
-                0,
-                nvme_reservation_acquire_action::ACQUIRE,
+                preempt_key,
+                match preempt_key {
+                    0 => nvme_reservation_acquire_action::ACQUIRE,
+                    _ => nvme_reservation_acquire_action::PREEMPT,
+                },
                 nvme_reservation_type::WRITE_EXCLUSIVE_ALL_REGS,
             )
             .await
