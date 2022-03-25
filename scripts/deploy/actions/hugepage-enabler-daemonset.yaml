@@ -15,7 +15,7 @@ spec:
       - name: busybox
         image: busybox
         command: ["/bin/sh","-c"]
-        args: ["mkdir -p host/mnt/huge; mount -t hugetlbfs nodev host/mnt/huge; echo 1024 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages; echo 'vm.nr_hugepages=1024' >> host/etc/sysctl.conf; echo EOF > /var/run/reboot-required; while true; do echo Polling; sleep 1m; done"]
+        args: ["modprobe -a nvmet nvme-rdma nvme-fc nvmet-fc nvme-tcp nvmet-tcp nvme-fabrics; mkdir -p host/mnt/huge; mount -t hugetlbfs nodev host/mnt/huge; echo 1024 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages; echo 'vm.nr_hugepages=1024' >> host/etc/sysctl.conf; echo EOF > /var/run/reboot-required; while true; do echo Polling; sleep infinity; done"]
         resources:
           limits:
             cpu: 200m
@@ -30,10 +30,29 @@ spec:
         - name: host-root-volume
           mountPath: /host
           readOnly: false
+        - name: var-dir
+          mountPath: /var/run/
+          readOnly: false
+        - name: sbin
+          mountPath: /sbin
+          readOnly: false
+        - name: lib-modules
+          mountPath: /lib/modules
+          readOnly: false
       volumes:
       - name: host-root-volume
         hostPath:
           path: /
+      - name: var-dir
+        hostPath:
+          path: /var/run/
+          type: Directory
+      - name: sbin
+        hostPath:
+          path: /sbin
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
       hostNetwork: true
       hostPID: true
       restartPolicy: Always
