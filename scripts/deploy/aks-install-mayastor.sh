@@ -22,7 +22,10 @@ kubectl label nodes --selector agentpool=agentpool openebs.io/engine=mayastor --
 kubectl apply -f "${PKG_ROOT}/scripts/deploy/actions/hugepage-enabler-daemonset.yaml"
 kubectl rollout status daemonset/hugepage --watch --timeout 5m
 kubectl apply -f "${PKG_ROOT}/scripts/deploy/actions/kured-config.yaml"
-sleep 5m
+sleep 15m
+kubectl delete -f "${PKG_ROOT}/scripts/deploy/actions/kured-config.yaml" --ignore-not-found=true
+kubectl delete -f "${PKG_ROOT}/scripts/deploy/actions/hugepage-enabler-daemonset.yaml" --ignore-not-found=true
+sleep 2m
 
 kubectl create namespace mayastor
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/operator-rbac.yaml
@@ -31,7 +34,7 @@ kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plan
 kubectl apply -f "${PKG_ROOT}/scripts/deploy/config/etcd-azure.yaml"
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/svc.yaml
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/svc-headless.yaml
-kubectl rollout status statefulset/mayastor-etcd --namespace mayastor --watch --timeout 5m
+kubectl rollout status statefulset/mayastor-etcd --namespace mayastor --watch --timeout 15m
 
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/nats-deployment.yaml
 kubectl rollout status statefulset/nats --namespace mayastor --watch --timeout 5m
@@ -52,5 +55,5 @@ kubectl rollout status deployment/csi-controller --namespace mayastor --watch --
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/msp-deployment.yaml
 kubectl rollout status deployment/msp-operator --namespace mayastor --watch --timeout 5m
 
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-daemonset.yaml
-kubectl rollout status daemonset/mayastor --namespace mayastor --watch --timeout 5m
+kubectl apply -f "${PKG_ROOT}/scripts/deploy/config/mayastor-daemonset.yaml"
+kubectl rollout status daemonset/mayastor --namespace mayastor --watch --timeout

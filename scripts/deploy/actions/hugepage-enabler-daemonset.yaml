@@ -15,7 +15,7 @@ spec:
       - name: busybox
         image: busybox
         command: ["/bin/sh","-c"]
-        args: ["echo nvmet >> /etc/modules; echo nvme-rdma >> /etc/modules; echo nvme-fc >> /etc/modules; echo nvmet-fc >> /etc/modules; echo nvme-tcp >> /etc/modules; echo nvmet-tcp >> /etc/modules; echo nvme-fabrics >> /etc/modules; mkdir -p host/mnt/huge; mount -t hugetlbfs nodev host/mnt/huge; echo 1024 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages; echo 'vm.nr_hugepages=1024' >> host/etc/sysctl.conf; echo EOF > /var/run/reboot-required; while true; do echo Polling; sleep infinity; done"]
+        args: ["mkdir -p /var/openebs/mayastor/images/; dd if=/dev/zero of=/var/openebs/mayastor/images/disk2.img bs=4M count=128; losetup /dev/loop2 /var/openebs/mayastor/images/disk2.img; echo nvmet >> /etc/modules; echo nvme-rdma >> /etc/modules; echo nvme-fc >> /etc/modules; echo nvmet-fc >> /etc/modules; echo nvme-tcp >> /etc/modules; echo nvmet-tcp >> /etc/modules; echo nvme-fabrics >> /etc/modules; mkdir -p host/mnt/huge; mount -t hugetlbfs nodev host/mnt/huge; echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages; echo 'vm.nr_hugepages=2048' >> host/etc/sysctl.conf; echo EOF > /var/run/reboot-required; while true; do echo Polling; sleep infinity; done"]
         resources:
           limits:
             cpu: 200m
@@ -36,12 +36,13 @@ spec:
         - name: sbin
           mountPath: /sbin
           readOnly: false
-        - name: lib-modules
-          mountPath: /lib/modules
-          readOnly: false
         - name: kernel-modules
           mountPath: /etc
           readOnly: false
+        - name: device
+          mountPath: /dev
+        - name: var
+          mountPath: /var
       volumes:
       - name: host-root-volume
         hostPath:
@@ -53,12 +54,17 @@ spec:
       - name: sbin
         hostPath:
           path: /sbin
-      - name: lib-modules
-        hostPath:
-          path: /lib/modules
       - name: kernel-modules
         hostPath:
           path: /etc
+      - name: device
+        hostPath:
+          path: /dev
+          type: Directory
+      - name: var
+        hostPath:
+          path: /var
+          type: Directory
       hostNetwork: true
       hostPID: true
       restartPolicy: Always
