@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: &name azstor-prereq
+  labels:
+    app: *name
+spec:
+  selector:
+    matchLabels:
+      app: *name
+  template:
+    metadata:
+      labels:
+        app: *name
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - image: mcr.microsoft.com/oss/mirror/docker.io/library/ubuntu:18.04
+        imagePullPolicy: Always
+        name: *name
+        command: ["/bin/sh"]
+        args: ["-c", "/opt/actions/azstor-prereq.sh"]
+        resources:
+          requests: {}
+          limits: {}
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: actions
+          mountPath: "/opt/actions"
+        - name: hostmount
+          mountPath: "/mnt/actions"
+        - name: var
+          mountPath: "/var"
+      volumes:
+      - name: hostmount
+        hostPath:
+          path: /opt/actions
+          type: DirectoryOrCreate
+      - name: actions
+        configMap:
+          name: nsenter-actions
+          defaultMode: 0777
+      - name: var
+        hostPath:
+          path: /var
+          type: Directory          
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nsenter-actions
+  labels:
+    app: nsenter
+data:
+  enable-hugepages-and-nvme: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    modprobe -a nvmet nvme-rdma nvme-fc nvmet-fc nvme-tcp nvmet-tcp nvme-fabrics
+    FILE=/var/run/azstor-prereq
+    NOACTIONFILE=/var/run/azstor-prereq-no-action
+    if [ -f "$FILE" ]; then
+      echo "$FILE exists." > $NOACTIONFILE
+    else
+      mkdir -p /mnt/huge
+      mount -t hugetlbfs nodev /mnt/huge
+      echo 1024 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+      echo 'vm.nr_hugepages=1024' > /etc/sysctl.d/99-hugepages.conf
+      echo EOF > $FILE
+      sysctl --system
+      systemctl restart kubelet
+    fi
+    sleep infinity
+  azstor-prereq.sh: |
+    #!/usr/bin/env bash
+    set -o errexit
+    set -o pipefail
+    set -o nounset
+
+    ACTION_FILE="/opt/actions/enable-hugepages-and-nvme"
+
+    if [[ ! -f "$ACTION_FILE" ]]; then
+        echo "Expected to find action file '$ACTION_FILE', but did not exist"
+        exit 1
+    fi
+
+    echo "Cleaning up stale actions"
+
+    rm -rf /mnt/actions/*
+
+    echo "Copying fresh actions"
+
+    cp -R /opt/actions/. /mnt/actions
+
+    echo "Executing nsenter"
+
+    nsenter -t 1 -m bash "${ACTION_FILE}"
+    RESULT="${PIPESTATUS[0]}"
+
+    if [ $RESULT -eq 0 ]; then
+        # Success.
+        rm -rf /mnt/actions/*
+        echo "Completed successfully!"
+        sleep infinity
+    else
+        echo "Failed during nsenter command execution"
+        exit 1
+    fi
+---

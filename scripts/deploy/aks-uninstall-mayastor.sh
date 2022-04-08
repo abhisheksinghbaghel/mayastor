@@ -17,7 +17,9 @@ set -euo pipefail
 
 readonly PKG_ROOT="$(git rev-parse --show-toplevel)"
 
-kubectl delete -f "${PKG_ROOT}/scripts/deploy/config/mayastor-daemonset.yaml" --ignore-not-found=true
+kubectl delete -f "${PKG_ROOT}/scripts/deploy/actions/azstor-prereq.yaml" --ignore-not-found=true
+
+kubectl delete -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-daemonset.yaml --ignore-not-found=true
 
 kubectl delete -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/msp-deployment.yaml --ignore-not-found=true
 
@@ -39,9 +41,5 @@ kubectl delete -f https://raw.githubusercontent.com/openebs/mayastor/master/depl
 kubectl delete namespace mayastor --ignore-not-found=true
 kubectl delete -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/operator-rbac.yaml --ignore-not-found=true
 kubectl delete -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/mayastorpoolcrd.yaml --ignore-not-found=true
-
-kubectl delete -f "${PKG_ROOT}/scripts/deploy/actions/hugepage-enabler-daemonset.yaml" --ignore-not-found=true
-
-kubectl delete -f "${PKG_ROOT}/scripts/deploy/actions/kured-config.yaml" --ignore-not-found=true
 
 kubectl delete namespace mayastor --ignore-not-found=true
