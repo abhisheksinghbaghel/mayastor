@@ -34,8 +34,15 @@
         },
         "agentPoolProfiles": [
             {
-                "name": "agentpool1",
+                "name": "storagepool",
                 "count": 3,
+                "vmSize": "Standard_D2s_v3",
+                "availabilityProfile": "AvailabilitySet",
+                "distro": "aks-ubuntu-18.04"
+            },
+            {
+                "name": "agentpool",
+                "count": 2,
                 "vmSize": "Standard_D2s_v3",
                 "availabilityProfile": "AvailabilitySet",
                 "distro": "aks-ubuntu-18.04"

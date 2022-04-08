@@ -40,7 +40,18 @@
         "agentPoolProfiles": [
             {
                 "name": "agentpool",
-                "count": 4,
+                "count": 2,
+                "vmSize": "Standard_D2s_v3",
+                "availabilityProfile": "VirtualMachineScaleSets",
+                "ultraSSDEnabled": true,
+                "availabilityZones": [
+                    "1",
+                    "2"
+                ]
+            },
+            {
+                "name": "storagepool",
+                "count": 3,
                 "vmSize": "Standard_D2s_v3",
                 "availabilityProfile": "VirtualMachineScaleSets",
                 "ultraSSDEnabled": true,
