@@ -31,13 +31,19 @@ Options:
   -s, --subscription [Required] : The subscription identifier.
   -n, --name string             : The Kubernetes cluster DNS name. Defaults to
                                   k8s-<git-commit>-<template>.
+  -c, --client-id string        : The service principal identifier. Default to
+                                  <name>-sp.
+  -e, --client-tenant string    : The client tenant. Required if --client-id
+                                  is used.
+  -p, --client-secret string    : The service principal password.  Required if
+                                  --client-id is used.
   -o, --output string           : The output directory. Defaults to
                                   ./_output/<name>.
   -r, --resource-group string   : The resource group name. Defaults to 
                                   <name>-rg
   -t, --template string         : The cluster template name or URL. Defaults
-                                  to multi-az.
-  -v, --k8s-version string      : The Kubernetes version. Defaults to 1.21.
+                                  to single-az.
+  -v, --k8s-version string      : The Kubernetes version. Defaults to 1.22.
 EOF
 }
 
@@ -53,7 +59,6 @@ unset AZURE_LOCATION
 unset AZURE_RESOURCE_GROUP
 unset AZURE_SUBSCRIPTION_ID
 unset AZURE_TENANT_ID
-unset ENABLE_AZURE_BASTION
 unset OUTPUT_DIR
 POSITIONAL=()
 
@@ -61,9 +66,20 @@ while [[ $# -gt 0 ]]
 do
   ARG="$1"
   case $ARG in
+
+    -c|--client-id)
+      AZURE_CLIENT_ID="$2"
+      shift 2 # skip the option arguments
+      ;;
+
     -d|--debug)
       set -x
       shift
+      ;;
+
+    -e|--client-tenant)
+      AZURE_TENANT_ID="$2"
+      shift 2 # skip the option arguments
       ;;
 
     -l|--location)
@@ -78,6 +94,11 @@ do
 
     -o|--output)
       OUTPUT_DIR="$2"
+      shift 2 # skip the option arguments
+      ;;
+
+    -p|--client-secret)
+      AZURE_CLIENT_SECRET="$2"
       shift 2 # skip the option arguments
       ;;
     
@@ -136,12 +157,25 @@ if [[ -z ${AZURE_LOCATION:-} ]]; then
   exit 1
 fi
 
+if [[ -n ${AZURE_CLIENT_ID:-} ]]; then
+  if [[ -z ${AZURE_CLIENT_SECRET:-} ]]; then
+    echoerr "ERROR: The --client-secret option is required when --client-id is used."
+    printhelp
+    exit 1
+  fi
+  if [[ -z ${AZURE_TENANT_ID:-} ]]; then
+    echoerr "ERROR: The --client-tenant option is required when --client-id is used."
+    printhelp
+    exit 1
+  fi
+fi
+
 if [[ -z ${AZURE_CLUSTER_TEMPLATE:-} ]]; then
-  AZURE_CLUSTER_TEMPLATE="multi-az"
+  AZURE_CLUSTER_TEMPLATE="single-az"
 fi
 
 if [[ -z ${AZURE_K8S_VERSION:-} ]]; then
-  AZURE_K8S_VERSION="1.21"
+  AZURE_K8S_VERSION="1.22"
 fi
 
 IS_AZURE_CLUSTER_TEMPLATE_URI=$(expr "$(expr "${AZURE_CLUSTER_TEMPLATE}" : "file://\|https://\|http://")" != 0 || true)
@@ -190,7 +224,11 @@ echo "Creating cluster ${AZURE_CLUSTER_DNS_NAME}"
 "${GIT_ROOT}/scripts/deploy/azure-cluster-up.sh" \
   --subscription "${AZURE_SUBSCRIPTION_ID}" \
   --location "${AZURE_LOCATION}" \
+  --client-id "${AZURE_CLIENT_ID}" \
+  --client-tenant "${AZURE_TENANT_ID}" \
+  --client-secret "${AZURE_CLIENT_SECRET}" \
   --name "${AZURE_CLUSTER_DNS_NAME}" \
+  --resource-group "${AZURE_RESOURCE_GROUP}" \
   --output "${OUTPUT_DIR}" \
   --k8s-version "${AZURE_K8S_VERSION}" \
   --template "${AZURE_CLUSTER_TEMPLATE}"
@@ -198,94 +236,13 @@ echo "Creating cluster ${AZURE_CLUSTER_DNS_NAME}"
 # Delete the cluster on subsequent errors.
 trap_push "\"${OUTPUT_DIR}/cluster-down.sh\"" err
 
-echo "Wait for cluster to become available..."
-# TODO Figure out a better way to determine cluster availability
-sleep 5m
-
 export KUBECONFIG="${OUTPUT_DIR}/kubeconfig/kubeconfig.${AZURE_LOCATION}.json"
 
-#
 # Install the Azure Disk CSI Driver
-#
-# echo "Installing Azure Disk CSI Driver..."
-# helm repo add azuredisk-csi-driver https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/master/charts
-# helm upgrade \
-#   --install \
-#   --namespace kube-system \
-#   azuredisk-csi-driver \
-#   azuredisk-csi-driver/azuredisk-csi-driver \
-#   -f "${AZURE_CLUSTER_TEMPLATE_ROOT}/${AZURE_CLUSTER_TEMPLATE}/azuredisk-csi-driver-values.yaml"
-# echo "Waiting for Azure Disk CSI Driver to start..."
-# kubectl wait pods --namespace kube-system --selector app.kubernetes.io/instance=azuredisk-csi-driver --for condition=ready --timeout=15m
+echo "Installing Azure Disk CSI Driver..."
+helm install azuredisk-csi-driver azuredisk-csi-driver \
+--repo https://raw.githubusercontent.com/kubernetes-sigs/azuredisk-csi-driver/main_v2/charts/ \
+--version v2.0.0-beta.2 \
+--namespace kube-system  
 
-#
-# Apply label to Mayastor Node Candidates
-#
-echo "Labelling Mayastor Node Candidates..."
-kubectl label nodes --selector agentpool=agentpool openebs.io/engine=mayastor 
-
-#
-# Enable hugepages and restart kubelet
-#
-echo "Enabling HugePages and restarting kubelet..."
-kubectl apply -f actions/azstor-prereq.yaml
-sleep 2m
-
-#
-# Creating Mayastor Application Namespace and Resources
-#
-echo "Starting Mayastor specific operations..."
-kubectl create namespace mayastor
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/operator-rbac.yaml
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/mayastorpoolcrd.yaml
-
-#
-# Deploy NATS
-#
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/nats-deployment.yaml
-sleep 2m
-getPodsStatus "mayastor" "app=nats"
-
-#
-# Deploy dedicated etcd 
-#
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/storage/localpv.yaml
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/statefulset.yaml 
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/svc.yaml
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/svc-headless.yaml
-sleep 2m
-getPodsStatus "mayastor" "app.kubernetes.io/name=etcd"
-
-#
-# Deploy Mayastor Components
-#
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/csi-daemonset.yaml
-sleep 2m
-getDaemonsetStatus "mayastor" "mayastor-csi"
-
-#
-# Deploy Control Plane Components
-#
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/core-agents-deployment.yaml
-sleep 2m
-getPodsStatus "mayastor" "app=core-agents"
-
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/rest-deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/rest-service.yaml
-sleep 2m
-getPodsStatus "mayastor" "app=rest"
-
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/csi-deployment.yaml
-sleep 2m
-getPodsStatus "mayastor" "app=csi-controller"
-
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/msp-deployment.yaml
-sleep 2m
-getPodsStatus "mayastor" "app=msp-operator"
-
-#
-# Deploy Data Plane
-#
-kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/mayastor-daemonset.yaml
-sleep 2m
-getDaemonsetStatus "mayastor" "mayastor"
+${GIT_ROOT}/scripts/deploy/aks-install-mayastor.sh

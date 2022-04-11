@@ -17,7 +17,7 @@ set -euo pipefail
 
 readonly PKG_ROOT="$(git rev-parse --show-toplevel)"
 
-kubectl label nodes --selector agentpool=agentpool openebs.io/engine=mayastor --overwrite
+kubectl label nodes --selector agentpool=storagepool openebs.io/engine=mayastor --overwrite
 
 kubectl apply -f "${PKG_ROOT}/scripts/deploy/actions/azstor-prereq.yaml"
 kubectl rollout status daemonset/azstor-prereq --watch --timeout 5m
