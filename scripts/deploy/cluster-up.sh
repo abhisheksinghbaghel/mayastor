@@ -238,7 +238,6 @@ trap_push "\"${OUTPUT_DIR}/cluster-down.sh\"" err
 
 export KUBECONFIG="${OUTPUT_DIR}/kubeconfig/kubeconfig.${AZURE_LOCATION}.json"
 
-
 # Install the Azure Disk CSI Driver
 echo "Installing Azure Disk CSI Driver..."
 helm install azuredisk-csi-driver azuredisk-csi-driver \

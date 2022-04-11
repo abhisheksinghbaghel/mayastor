@@ -19,10 +19,8 @@ readonly PKG_ROOT="$(git rev-parse --show-toplevel)"
 
 kubectl label nodes --selector agentpool=storagepool openebs.io/engine=mayastor --overwrite
 
-kubectl apply -f "${PKG_ROOT}/scripts/deploy/actions/hugepage-enabler-daemonset.yaml"
-kubectl rollout status daemonset/hugepage --watch --timeout 5m
-kubectl apply -f "${PKG_ROOT}/scripts/deploy/actions/kured-config.yaml"
-sleep 5m
+kubectl apply -f "${PKG_ROOT}/scripts/deploy/actions/azstor-prereq.yaml"
+kubectl rollout status daemonset/azstor-prereq --watch --timeout 5m
 
 kubectl create namespace mayastor
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plane/master/deploy/operator-rbac.yaml
@@ -31,7 +29,7 @@ kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor-control-plan
 kubectl apply -f "${PKG_ROOT}/scripts/deploy/config/etcd-azure.yaml"
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/svc.yaml
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/etcd/svc-headless.yaml
-kubectl rollout status statefulset/mayastor-etcd --namespace mayastor --watch --timeout 5m
+kubectl rollout status statefulset/mayastor-etcd --namespace mayastor --watch --timeout 15m
 
 kubectl apply -f https://raw.githubusercontent.com/openebs/mayastor/master/deploy/nats-deployment.yaml
 kubectl rollout status statefulset/nats --namespace mayastor --watch --timeout 5m
